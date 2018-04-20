@@ -177,13 +177,27 @@ sc = StandardScaler()
 x_train.loc[:,numerical_features] = sc.fit_transform(x_train.loc[:,numerical_features])
 x_val.loc[:,numerical_features] = sc.transform(x_val.loc[:,numerical_features])
 
+
+#lets perform cross validation to get better accuracy
+def rmse_cv_train(model):
+    rmse = np.sqrt(-cross_val_score(model, x_train, y_train, scoring = "neg_mean_squared_error", cv = 10))
+    return(rmse)
+
+def rmse_cv_test(model):
+    rmse= np.sqrt(-cross_val_score(model, x_val, y_val, scoring = "neg_mean_squared_error", cv = 10))
+    return(rmse)
+
 #let's start modelling
 lr = LinearRegression()
-model_lr = lr.fit(x_train, y_train)
-y_val_pred_lr = model_lr.predict(x_val)
+lr.fit(x_train, y_train)
+y_val_pred_lr = lr.predict(x_val)
 
 rmse_lr = sqrt(mean_squared_error(y_val, y_val_pred_lr))
-
+print(rmse_lr)#without cv
+rmse_cv_lr_train = rmse_cv_train(lr).mean()
+print(rmse_cv_lr_train)
+rmse_cv_lr_test = rmse_cv_test(lr).mean()
+print(rmse_cv_lr_test)
 
 #lets try ridgecv
 ridge = RidgeCV(alphas = [0.01, 0.03, 0.06, 0.1, 0.3, 0.6, 1, 3, 6, 10, 30, 60])
@@ -202,6 +216,13 @@ print("Best alpha :", alpha)
 y_val_pred_ridge = ridge.predict(x_val)
 rmse_lr_ridge = sqrt(mean_squared_error(y_val, y_val_pred_ridge))
 print(rmse_lr_ridge)#0.11429750740258748
+
+#with cv
+rmse_cv_ridge_train = rmse_cv_train(ridge).mean()
+print(rmse_cv_ridge_train)
+rmse_cv_ridge_test = rmse_cv_test(ridge).mean()
+print(rmse_cv_ridge_test)
+
 #lets visualize the important features
 coefs_ridge = pd.Series(ridge.coef_, index=x_train.columns)
 imp_coefs = pd.concat([coefs_ridge.sort_values().head(10), coefs_ridge.sort_values().tail(10)]) 
@@ -210,6 +231,7 @@ plt.title("imp coeffs of ridge")
 
 print("ridge picked " + str(sum(coefs_ridge != 0)) + " features and eliminated the other " +  \
       str(sum(coefs_ridge == 0)) + " features")
+
 
 
 #let's try LassoCV
