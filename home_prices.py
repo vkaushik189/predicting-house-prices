@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
 from math import sqrt
+from sklearn.metrics import r2_score
 def ignore_warn(*args, **kwargs):
     pass
 warnings.warn = ignore_warn #ignore annoying warning (from sklearn and seaborn)
@@ -23,6 +24,7 @@ from scipy.stats import norm, skew
 from sklearn.linear_model import LinearRegression, RidgeCV, LassoCV, ElasticNetCV
 from sklearn.metrics import mean_squared_error, make_scorer
 from sklearn.ensemble import RandomForestRegressor,  GradientBoostingRegressor
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.kernel_ridge import KernelRidge
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
@@ -200,6 +202,14 @@ print("Best alpha :", alpha)
 y_val_pred_ridge = ridge.predict(x_val)
 rmse_lr_ridge = sqrt(mean_squared_error(y_val, y_val_pred_ridge))
 print(rmse_lr_ridge)#0.11429750740258748
+#lets visualize the important features
+coefs_ridge = pd.Series(ridge.coef_, index=x_train.columns)
+imp_coefs = pd.concat([coefs_ridge.sort_values().head(10), coefs_ridge.sort_values().tail(10)]) 
+imp_coefs.plot(kind = "barh")
+plt.title("imp coeffs of ridge")
+
+print("ridge picked " + str(sum(coefs_ridge != 0)) + " features and eliminated the other " +  \
+      str(sum(coefs_ridge == 0)) + " features")
 
 
 #let's try LassoCV
@@ -219,6 +229,19 @@ print("best alpha:", alpha)
 y_val_pred_lasso = lasso.predict(x_val)
 rmse_lr_lasso = sqrt(mean_squared_error(y_val, y_val_pred_lasso))
 print(rmse_lr_lasso)#0.111861949
+
+#to check the important co-eff after performing lasso
+coef = pd.Series(lasso.coef_, index = x_train.columns)
+coef.sort_values(ascending = False).head(10)#top 10 features that increase the home price
+coef.sort_values().head(10)#top 10 features that decrease the home price
+
+#to visualizr the above features
+imp_coefs = pd.concat([coef.sort_values().head(10),coef.sort_values().tail(10)])
+imp_coefs.plot(kind = "barh")
+plt.title("imp coeffs of lasso")
+
+print("Lasso picked " + str(sum(coef != 0)) + " features and eliminated the other " +  \
+      str(sum(coef == 0)) + " features")
 
 
 
@@ -263,6 +286,38 @@ print("Best alpha :", alpha )
 y_val_ela = elasticNet.predict(x_val)
 rmse_ela = sqrt(mean_squared_error(y_val, y_val_ela))
 print(rmse_ela)#0.1118
+
+# Plot important coefficients
+coefs = pd.Series(elasticNet.coef_, index = x_train.columns)
+imp_coefs = pd.concat([coefs.sort_values().head(10),coefs.sort_values().tail(10)])
+imp_coefs.plot(kind = "barh")
+plt.title("Coefficients in the ElasticNet Model")
+print("elasticNet picked " + str(sum(coefs != 0)) + " features and eliminated the other " +  \
+      str(sum(coefs == 0)) + " features")
+
+
+
+#let's apply Kernel Ridge
+kernalridge = KernelRidge(alpha=0.6, kernel='polynomial', degree=2, coef0=2.5)
+kernalridge.fit(x_train, y_train)
+y_val_pred_ker = kernalridge.predict(x_val)
+
+rmse_ker = sqrt(mean_squared_error(y_val, y_val_pred_ker))
+print(rmse_ker)#0.1124
+from scipy import stats
+slope, intercept, r_value, p_value, std_err = stats.linregress(y_val, y_val_pred_ker)
+print(slope, intercept, r_value, p_value, std_err)
+
+plt.scatter(y_val_pred_ker, y_val_pred_ker-y_val, c='g', s=40)
+
+
+#let's apply decisiontree
+dectree = DecisionTreeRegressor()
+dectree.fit(x_train, y_train)
+y_val_pred_dectree = dectree.predict(x_val)
+
+rmse_dectree = sqrt(mean_squared_error(y_val_pred_dectree, y_val))
+print(rmse_dectree)#0.20
 
 
 
