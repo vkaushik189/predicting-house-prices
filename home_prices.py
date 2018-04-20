@@ -20,7 +20,9 @@ def ignore_warn(*args, **kwargs):
 warnings.warn = ignore_warn #ignore annoying warning (from sklearn and seaborn)
 from scipy import stats
 from scipy.stats import norm, skew
+import xgboost as xgb
 
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import LinearRegression, RidgeCV, LassoCV, ElasticNetCV
 from sklearn.metrics import mean_squared_error, make_scorer
 from sklearn.ensemble import RandomForestRegressor,  GradientBoostingRegressor
@@ -30,6 +32,7 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.base import BaseEstimator, TransformerMixin, RegressorMixin, clone
 from sklearn.model_selection import KFold, cross_val_score, train_test_split
+import lightgbm as lgb 
 
 #read the files and save in dfs
 train = pd.read_csv("C:\\Users\\kaushik\\AnacondaProjects\\train-housing.csv")
@@ -179,25 +182,13 @@ x_val.loc[:,numerical_features] = sc.transform(x_val.loc[:,numerical_features])
 
 
 #lets perform cross validation to get better accuracy
-def rmse_cv_train(model):
-    rmse = np.sqrt(-cross_val_score(model, x_train, y_train, scoring = "neg_mean_squared_error", cv = 10))
-    return(rmse)
-
-def rmse_cv_test(model):
-    rmse= np.sqrt(-cross_val_score(model, x_val, y_val, scoring = "neg_mean_squared_error", cv = 10))
-    return(rmse)
-
 #let's start modelling
 lr = LinearRegression()
-lr.fit(x_train, y_train)
-y_val_pred_lr = lr.predict(x_val)
+model_lr = lr.fit(x_train, y_train)
+y_val_pred_lr = model_lr.predict(x_val)
 
 rmse_lr = sqrt(mean_squared_error(y_val, y_val_pred_lr))
-print(rmse_lr)#without cv
-rmse_cv_lr_train = rmse_cv_train(lr).mean()
-print(rmse_cv_lr_train)
-rmse_cv_lr_test = rmse_cv_test(lr).mean()
-print(rmse_cv_lr_test)
+
 
 #lets try ridgecv
 ridge = RidgeCV(alphas = [0.01, 0.03, 0.06, 0.1, 0.3, 0.6, 1, 3, 6, 10, 30, 60])
@@ -216,13 +207,6 @@ print("Best alpha :", alpha)
 y_val_pred_ridge = ridge.predict(x_val)
 rmse_lr_ridge = sqrt(mean_squared_error(y_val, y_val_pred_ridge))
 print(rmse_lr_ridge)#0.11429750740258748
-
-#with cv
-rmse_cv_ridge_train = rmse_cv_train(ridge).mean()
-print(rmse_cv_ridge_train)
-rmse_cv_ridge_test = rmse_cv_test(ridge).mean()
-print(rmse_cv_ridge_test)
-
 #lets visualize the important features
 coefs_ridge = pd.Series(ridge.coef_, index=x_train.columns)
 imp_coefs = pd.concat([coefs_ridge.sort_values().head(10), coefs_ridge.sort_values().tail(10)]) 
@@ -231,7 +215,6 @@ plt.title("imp coeffs of ridge")
 
 print("ridge picked " + str(sum(coefs_ridge != 0)) + " features and eliminated the other " +  \
       str(sum(coefs_ridge == 0)) + " features")
-
 
 
 #let's try LassoCV
@@ -343,9 +326,54 @@ print(rmse_dectree)#0.20
 
 
 
+#let's apply RandomForest
+randfrst = RandomForestRegressor(max_depth = 12)
+randfrst.fit(x_train, y_train)
+y_val_pred_randfrst = randfrst.predict(x_val)
+
+rmse_randfrst = sqrt(mean_squared_error(y_val_pred_randfrst, y_val))
+print(rmse_randfrst)
+
+
+#ensemble -- many weak learners
+#bagging --rand forest -- each bag gets data, repetation is there--count the vote 
+#boosting -- AdaBoost -- one bag gets data -- trained and tested on that bag--errors are
+#sent to the next bag along with some original random points
+
+#let's apply gradient boosting mechanism
+gbr = GradientBoostingRegressor(n_estimators=1000, learning_rate=0.05,
+                                   max_depth=4, max_features='sqrt',
+                                   min_samples_leaf=15, min_samples_split=10, 
+                                   loss='huber', random_state =5)
+gbr.fit(x_train,y_train)
+y_val_gbr = gbr.predict(x_val)
+
+rmse_gbr = sqrt(mean_squared_error(y_val, y_val_gbr))
+print(rmse_gbr)#0.118
+
+
+#let's do using xgboost
+model_xgb = xgb.XGBRegressor(colsample_bytree=0.4603, gamma=0.0468, 
+                             learning_rate=0.05, max_depth=3, 
+                             min_child_weight=1.7817, n_estimators=2200,
+                             reg_alpha=0.4640, reg_lambda=0.8571,
+                             subsample=0.5213, silent=1,
+                             random_state =7, nthread = -1)
 
 
 
+
+#modelling in LightGBM
+model_lgb = lgb.LGBMRegressor(objective='regression',num_leaves=5,
+                              learning_rate=0.05, n_estimators=720,
+                              max_bin = 55, bagging_fraction = 0.8,
+                              bagging_freq = 5, feature_fraction = 0.2319,
+                              feature_fraction_seed=9, bagging_seed=9,
+                              min_data_in_leaf =6, min_sum_hessian_in_leaf = 11)
+model_lgb.fit(x_train, y_train)
+y_val_pred_lgbm = model_lgb.predict(x_val)
+rmse_lgb = sqrt(mean_squared_error(y_val, y_val_pred_lgbm))
+print(rmse_lgb)#0.1200
 
 
 
